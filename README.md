@@ -1,0 +1,2 @@
+# AmiiboLoots
+v2
