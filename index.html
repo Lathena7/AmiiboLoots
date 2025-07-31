@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Amiibo Simulator Zelda BOTW</title>
+<style>
+  body {font-family: Arial, sans-serif;background: url('https://cdn.wikimg.net/en/zeldawiki/images/1/1d/TotK_Lurelin_Village.png') no-repeat center center fixed;background-size: cover;margin: 0;padding: 1rem;color: #222;}
+  .container {max-width: 900px;margin: 0 auto;background-color: rgba(255 255 255 / 0.9);padding: 15px 20px;border-radius: 8px;}
+  #amiiboSelect, #scanSizeSelect, #multiScanInput, #simulationCountInput {margin-bottom: 15px;padding: 5px;border-radius: 4px;}
+  h1 {text-align: center;font-size: 2rem;margin-bottom: 20px;color: #333;text-shadow: 1px 1px 2px rgba(0,0,0,0.2);}
+  #lootContainer {display: flex;flex-wrap: wrap;gap: 15px;margin-bottom: 20px;}
+  .loot-slot {display: flex;flex-direction: column;align-items: center;width: 120px;}
+  .loot-slot select {width: 120px;}
+  .loot-image {margin-top: 5px;max-width: 100px;max-height: 80px;display: none;object-fit: contain;border-radius: 4px;box-shadow: 0 0 6px rgba(0,0,0,0.2);}
+  #result {font-size: 1.3rem;font-weight: bold;margin-top: 10px;}
+  #resetBtn {margin-top: 10px;padding: 8px 12px;border: none;border-radius: 5px;background: #d9534f;color: #fff;font-weight: bold;cursor: pointer;transition: background 0.2s;}
+  #resetBtn:hover {background: #c9302c;}
+  .signature {position: fixed;bottom: 15px;right: 15px;font-size: 1.3rem;color: rgba(0,0,0,0.8);font-style: italic;text-shadow: 1px 1px 3px rgba(255,255,255,0.8);}
+  /* Lien instructions */
+  #instructionsLink {margin-top:20px; text-align:center;}
+  #instructionsLink a {color:blue; text-decoration:underline; cursor:pointer;}
+
+  /* Page d'instructions */
+  #instructionsPage {
+    display:none; 
+    position:fixed; 
+    top:0; left:0; 
+    width:100%; height:100%; 
+    background:rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    z-index:1000;
+    padding:40px;
+    box-sizing:border-box;
+    opacity:0;
+    transition: opacity 0.3s ease;
+  }
+  #instructionsPage.show {opacity:1;}
+  #instructionsContent {
+    max-width:800px;
+    margin:50px auto;
+    background:white;
+    padding:20px;
+    border-radius:8px;
+    box-shadow:0 0 15px rgba(0,0,0,0.5);
+  }
+  #instructionsContent h2 {margin-top:0;}
+  #instructionsContent p {margin-bottom:12px; line-height:1.5;}
+  #instructionsContent ul {margin-bottom:15px;}
+  #instructionsContent li {margin-bottom:8px;}
+  #backToSimulator {
+    margin-top:20px;
+    padding:10px 15px;
+    background:#337ab7;
+    color:white;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+  }
+  #backToSimulator:hover {background:#286090;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Botw Amiibo Loot Probability</h1>
+  <label for="amiiboSelect"><strong>Choose an amiibo :</strong></label>
+  <select id="amiiboSelect"></select>
+  <label for="scanSizeSelect"><strong>Item Count :</strong></label>
+  <select id="scanSizeSelect"></select>
+  <label for="multiScanInput"><strong>Number of scans :</strong></label>
+  <input id="multiScanInput" type="number" min="1" value="1" />
+  <div style="margin-top:10px;"></div>
+    <label for="simulationCountInput"><strong>Number of simulations :</strong></label>
+    <input id="simulationCountInput" type="number" min="10000" max="2000000" step="10000" value="200000" />
+  <div>
+  <div id="lootContainer"></div>
+  <button id="resetBtn">Reset</button>
+  <div id="result">
+    Probability to get at least the selected items in <span id="scanCountDisplay">1 scan</span>: <span id="atleastProb">0%</span>
+  </div>
+
+  <!-- Lien vers les instructions -->
+  <div id="instructionsLink">
+    <a href="#" id="showInstructions">Instructions</a>
+  </div>
+
+</div>
+<div class="signature">By Lathena, v 2.0 </div>
+
+<!-- Page Instructions -->
+<div id="instructionsPage">
+  <div id="instructionsContent">
+    <h2>Instructions </h2>
+    <p>
+      Welcome in amiibo simulator for <strong>Zelda Breath of the Wild</strong>!
+    </p>
+    <ul>
+      <li>You can choose which amiibo and the number of scans you want.</li>
+      <li>Select item count (only for a few amiibos like Urbosa and Daruk).</li>
+      <li>To calculate probabilities, the site performs thousands of simulations. The greater the number of simulations you select, the more accurate the probabilities will be. The time it takes for the simulator to calculate probabilities depends on the number you choose and the computing power of your device. Recommended number of simulations: 200,000.</li>
+      <li>The site calculates the probability of having at least the selected items in the desired number of scans.</li>
+    </ul>
+    <p>
+      Use the <strong>Reset</strong> button to clear all selections.
+    </p>
+    <button id="backToSimulator">Back to simulator</button>
+  </div>
+</div>
+
+<script>
+// === Amiibos ===
+const amiibos = {
+  "Ganondorf (1)": {
+    min: 5, max: 5,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Barrel (100%)", prob: 1.00, img: "BotW_Barrel_Icon.png"}
+    ]
+  },
+  "Toon Link (2)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Hyrule Bass (34%)", prob: 0.34, img: "BotW_Hyrule_Bass_Icon.png"},
+      {name: "Staminoka Bass (10%)", prob: 0.10, img: "BotW_Staminoka_Bass_Icon.png"},
+      {name: "Chillfin Trout (5%)", prob: 0.05, img: "BotW_Chillfin_Trout_Icon.png"},
+      {name: "Sizzlefin Trout (5%)", prob: 0.05, img: "BotW_Sizzlefin_Trout_Icon.png"},
+      {name: "Voltfin Trout (5%)", prob: 0.05, img: "BotW_Voltfin_Trout_Icon.png"},
+      {name: "Stealthfin Trout (5%)", prob: 0.05, img: "BotW_Stealthfin_Trout_Icon.png"},
+      {name: "Mighty Carp (12%)", prob: 0.12, img: "BotW_Mighty_Carp_Icon.png"},
+      {name: "Armored Carp (12%)", prob: 0.12, img: "BotW_Armored_Carp_Icon.png"},
+      {name: "Mighty Porgy (6%)", prob: 0.06, img: "BotW_Mighty_Porgy_Icon.png"},
+      {name: "Armored Porgy (6%)", prob: 0.06, img: "BotW_Armored_Porgy_Icon.png"}
+    ]
+  },
+  "Twilight Link (7)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Apple (15%)", prob: 0.15, img: "BotW_Apple_Icon.png"},
+      {name: "Palm Fruit (10%)", prob: 0.10, img: "BotW_Palm_Fruit_Icon.png"},
+      {name: "Wild Berry (10%)", prob: 0.10, img: "BotW_Wildberry_Icon.png"},
+      {name: "Acorn (10%)", prob: 0.10, img: "BotW_Acorn_Icon.png"},
+      {name: "Chickaloo Tree Nut (10%)", prob: 0.10, img: "BotW_Chickaloo_Tree_Nut_Icon.png"},
+      {name: "Hydromelon (10%)", prob: 0.10, img: "BotW_Hydromelon_Icon.png"},
+      {name: "Spicy Pepper (10%)", prob: 0.10, img: "BotW_Spicy_Pepper_Icon.png"},
+      {name: "Voltfruit (10%)", prob: 0.10, img: "BotW_Voltfruit_Icon.png"},
+      {name: "Fleet-Lotus Seed (10%)", prob: 0.10, img: "BotW_Fleet-Lotus_Seeds_Icon.png"},
+      {name: "Mighty Bananas (5%)", prob: 0.05, img: "BotW_Mighty_Bananas_Icon.png"}
+    ]
+  },
+  "Archer Link (8)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Hyrule Bass (12%)", prob: 0.12, img: "BotW_Hyrule_Bass_Icon.png"},
+      {name: "Staminoka Bass (10%)", prob: 0.10, img: "BotW_Staminoka_Bass_Icon.png"},
+      {name: "Chillfin Trout (5%)", prob: 0.05, img: "BotW_Chillfin_Trout_Icon.png"},
+      {name: "Sizzlefin Trout (5%)", prob: 0.05, img: "BotW_Sizzlefin_Trout_Icon.png"},
+      {name: "Voltfin Trout (5%)", prob: 0.05, img: "BotW_Voltfin_Trout_Icon.png"},
+      {name: "Stealthfin Trout (5%)", prob: 0.05, img: "BotW_Stealthfin_Trout_Icon.png"},
+      {name: "Mighty Carp (8%)", prob: 0.08, img: "BotW_Mighty_Carp_Icon.png"},
+      {name: "Armored Carp (8%)", prob: 0.08, img: "BotW_Armored_Carp_Icon.png"},
+      {name: "Mighty Porgy (6%)", prob: 0.06, img: "BotW_Mighty_Porgy_Icon.png"},
+      {name: "Armored Porgy (6%)", prob: 0.06, img: "BotW_Armored_Porgy_Icon.png"},
+      {name: "Raw Meat (12%)", prob: 0.12, img: "BotW_Raw_Meat_Icon.png"},
+      {name: "Raw Prime Meat (3%)", prob: 0.03, img: "BotW_Raw_Prime_Meat_Icon.png"},
+      {name: "Raw Bird Drumstick (12%)", prob: 0.12, img: "BotW_Raw_Bird_Drumstick_Icon.png"},
+      {name: "Raw Bird Thigh (3%)", prob: 0.03, img: "BotW_Raw_Bird_Thigh_Icon.png"}
+    ]
+  },
+  "Rider Link (9)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Hylian Shroom (35%)", prob: 0.35, img: "BotW_Hylian_Shroom_Icon.png"},
+      {name: "Stamela Shroom (5%)", prob: 0.05, img: "BotW_Stamella_Shroom_Icon.png"},
+      {name: "Chillshroom (10%)", prob: 0.10, img: "BotW_Chillshroom_Icon.png"},
+      {name: "Sunshroom (10%)", prob: 0.10, img: "BotW_Sunshroom_Icon.png"},
+      {name: "Zapshroom (10%)", prob: 0.10, img: "BotW_Zapshroom_Icon.png"},
+      {name: "Rushroom (10%)", prob: 0.10, img: "BotW_Rushroom_Icon.png"},
+      {name: "Razorshroom (5%)", prob: 0.05, img: "BotW_Razorshroom_Icon.png"},
+      {name: "Ironshroom (5%)", prob: 0.05, img: "BotW_Ironshroom_Icon.png"},
+      {name: "Silent Shroom (10%)", prob: 0.10, img: "BotW_Silent_Shroom_Icon.png"}
+    ]
+  },
+  "BotW Zelda (10)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Hyrule Herb (35%)", prob: 0.35, img: "BotW_Hyrule_Herb_Icon.png"},
+      {name: "Cool Safflina (10%)", prob: 0.10, img: "BotW_Cool_Safflina_Icon.png"},
+      {name: "Warm Safflina (10%)", prob: 0.10, img: "BotW_Warm_Safflina_Icon.png"},
+      {name: "Electric Safflina (10%)", prob: 0.10, img: "BotW_Electric_Safflina_Icon.png"},
+      {name: "Swift Carrot (10%)", prob: 0.10, img: "BotW_Swift_Carrot_Icon.png"},
+      {name: "Swift Violet (5%)", prob: 0.05, img: "BotW_Swift_Violet_Icon.png"},
+      {name: "Mighty Thistle (5%)", prob: 0.05, img: "BotW_Mighty_Thistle_Icon.png"},
+      {name: "Armoranth (5%)", prob: 0.05, img: "BotW_Armoranth_Icon.png"},
+      {name: "Fortified Pumpkin (5%)", prob: 0.05, img: "BotW_Fortified_Pumpkin_Icon.png"},
+      {name: "Blue Nightshade (5%)", prob: 0.05, img: "BotW_Blue_Nightshade_Icon.png"}
+    ]
+  },
+  "Daruk (12)": {
+    min: 6, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Rock Salt (60%)", prob: 0.60, img: "BotW_Rock_Salt_Icon.png"},
+      {name: "Flint (30%)", prob: 0.30, img: "BotW_Flint_Icon.png"},
+      {name: "Amber (10%)", prob: 0.10, img: "BotW_Amber_Icon.png"}
+    ]
+  },
+  "Revali (13)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Apple (20%)", prob: 0.20, img: "BotW_Apple_Icon.png"},
+      {name: "Palm Fruit (10%)", prob: 0.10, img: "BotW_Palm_Fruit_Icon.png"},
+      {name: "Wild Berry (15%)", prob: 0.15, img: "BotW_Wildberry_Icon.png"},
+      {name: "Acorn (10%)", prob: 0.10, img: "BotW_Acorn_Icon.png"},
+      {name: "Chickaloo Tree Nut (10%)", prob: 0.10, img: "BotW_Chickaloo_Tree_Nut_Icon.png"},
+      {name: "Hydromelon (5%)", prob: 0.05, img: "BotW_Hydromelon_Icon.png"},
+      {name: "Spicy Pepper (5%)", prob: 0.05, img: "BotW_Spicy_Pepper_Icon.png"},
+      {name: "Voltfruit (5%)", prob: 0.05, img: "BotW_Voltfruit_Icon.png"},
+      {name: "Fleet-Lotus Seed (5%)", prob: 0.05, img: "BotW_Fleet-Lotus_Seeds_Icon.png"},
+      {name: "Mighty Bananas (5%)", prob: 0.05, img: "BotW_Mighty_Bananas_Icon.png"},
+      {name: "Arrow x5 (10%)", prob: 0.10, img: "BotW_Armored_Porgy_Icon.png"}
+    ]
+  },
+  "Mipha (14)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Hyrule Bass (34%)", prob: 0.34, img: "BotW_Hyrule_Bass_Icon.png"},
+      {name: "Staminoka Bass (10%)", prob: 0.10, img: "BotW_Staminoka_Bass_Icon.png"},
+      {name: "Chillfin Trout (5%)", prob: 0.05, img: "BotW_Chillfin_Trout_Icon.png"},
+      {name: "Sizzlefin Trout (5%)", prob: 0.05, img: "BotW_Sizzlefin_Trout_Icon.png"},
+      {name: "Voltfin Trout (5%)", prob: 0.05, img: "BotW_Voltfin_Trout_Icon.png"},
+      {name: "Stealthfin Trout (5%)", prob: 0.05, img: "BotW_Stealthfin_Trout_Icon.png"},
+      {name: "Mighty Carp (12%)", prob: 0.12, img: "BotW_Mighty_Carp_Icon.png"},
+      {name: "Armored Carp (12%)", prob: 0.12, img: "BotW_Armored_Carp_Icon.png"},
+      {name: "Mighty Porgy (6%)", prob: 0.06, img: "BotW_Mighty_Porgy_Icon.png"},
+      {name: "Armored Porgy (6%)", prob: 0.06, img: "BotW_Armored_Porgy_Icon.png"}
+    ]
+  },
+  "Urbosa (15)": {
+    min: 6, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Raw Meat (40%)", prob: 0.40, img: "BotW_Raw_Meat_Icon.png"},
+      {name: "Raw Prime Meat (10%)", prob: 0.10, img: "BotW_Raw_Prime_Meat_Icon.png"},
+      {name: "Raw Bird Drumstick (40%)", prob: 0.40, img: "BotW_Raw_Bird_Drumstick_Icon.png"},
+      {name: "Raw Bird Thigh (10%)", prob: 0.10, img: "BotW_Raw_Bird_Thigh_Icon.png"}
+    ]
+  },
+  "Guardian (16)": {
+    min: 4, max: 4,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Iron Box (100%)", prob: 1.00, img: "BotW_Iron_Box_Icon.png"}
+    ]
+  },
+  "Bokoblin (17)": {
+    min: 6, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Raw Meat (90%)", prob: 0.90, img: "BotW_Raw_Meat_Icon.png"},
+      {name: "Raw Prime Meat (10%)", prob: 0.10, img: "BotW_Raw_Prime_Meat_Icon.png"}
+    ]
+  },
+  "Ocarina of Time Link (18)": {
+    min: 6, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Raw Meat (90%)", prob: 0.90, img: "BotW_Raw_Meat_Icon.png"},
+      {name: "Raw Prime Meat (10%)", prob: 0.10, img: "BotW_Raw_Prime_Meat_Icon.png"}
+    ]
+  },
+  "Majora's Mask Link (19)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Hylian Shroom (35%)", prob: 0.35, img: "BotW_Hylian_Shroom_Icon.png"},
+      {name: "Stamela Shroom (5%)", prob: 0.05, img: "BotW_Stamella_Shroom_Icon.png"},
+      {name: "Chillshroom (10%)", prob: 0.10, img: "BotW_Chillshroom_Icon.png"},
+      {name: "Sunshroom (10%)", prob: 0.10, img: "BotW_Sunshroom_Icon.png"},
+      {name: "Zapshroom (10%)", prob: 0.10, img: "BotW_Zapshroom_Icon.png"},
+      {name: "Rushroom (10%)", prob: 0.10, img: "BotW_Rushroom_Icon.png"},
+      {name: "Razorshroom (5%)", prob: 0.05, img: "BotW_Razorshroom_Icon.png"},
+      {name: "Ironshroom (5%)", prob: 0.05, img: "BotW_Ironshroom_Icon.png"},
+      {name: "Silent Shroom (10%)", prob: 0.10, img: "BotW_Silent_Shroom_Icon.png"}
+    ]
+  },
+  "Twilight Zelda (20)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: "BotW_Armored_Porgy_Icon.png"},
+      {name: "Hyrule Herb (35%)", prob: 0.35, img: "BotW_Hyrule_Herb_Icon.png"},
+      {name: "Cool Safflina (10%)", prob: 0.10, img: "BotW_Cool_Safflina_Icon.png"},
+      {name: "Warm Safflina (10%)", prob: 0.10, img: "BotW_Warm_Safflina_Icon.png"},
+      {name: "Electric Safflina (10%)", prob: 0.10, img: "BotW_Electric_Safflina_Icon.png"},
+      {name: "Swift Carrot (10%)", prob: 0.10, img: "BotW_Swift_Carrot_Icon.png"},
+      {name: "Swift Violet (5%)", prob: 0.05, img: "BotW_Swift_Violet_Icon.png"},
+      {name: "Mighty Thistle (5%)", prob: 0.05, img: "BotW_Mighty_Thistle_Icon.png"},
+      {name: "Armoranth (5%)", prob: 0.05, img: "BotW_Armoranth_Icon.png"},
+      {name: "Fortified Pumpkin (5%)", prob: 0.05, img: "BotW_Fortified_Pumpkin_Icon.png"},
+      {name: "Blue Nightshade (5%)", prob: 0.05, img: "BotW_Blue_Nightshade_Icon.png"}
+    ]
+  },
+  "Skyward Sword Linkf (21)": {
+    min: 4, max: 4,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Wooden Box (100%)", prob: 1.00, img: "BotW_Wooden_Box_Icon.png"}
+    ]
+  },
+  "8-Bit Link (22)": {
+    min: 5, max: 5,
+    loots: [
+      {name: "Empty", prob: 0.00, img: ""},
+      {name: "Barrel (100%)", prob: 1.00, img: "BotW_Barrel_Icon.png"}
+    ]
+  },
+  "Toon Zelda (23)": {
+    min: 8, max: 8,
+    loots: [
+      {name: "Empty", prob: 0.00, img: "BotW_Armored_Porgy_Icon.png"},
+      {name: "Hyrule Herb (35%)", prob: 0.35, img: "BotW_Hyrule_Herb_Icon.png"},
+      {name: "Cool Safflina (10%)", prob: 0.10, img: "BotW_Cool_Safflina_Icon.png"},
+      {name: "Warm Safflina (10%)", prob: 0.10, img: "BotW_Warm_Safflina_Icon.png"},
+      {name: "Electric Safflina (10%)", prob: 0.10, img: "BotW_Electric_Safflina_Icon.png"},
+      {name: "Swift Carrot (10%)", prob: 0.10, img: "BotW_Swift_Carrot_Icon.png"},
+      {name: "Swift Violet (5%)", prob: 0.05, img: "BotW_Swift_Violet_Icon.png"},
+      {name: "Mighty Thistle (5%)", prob: 0.05, img: "BotW_Mighty_Thistle_Icon.png"},
+      {name: "Armoranth (5%)", prob: 0.05, img: "BotW_Armoranth_Icon.png"},
+      {name: "Fortified Pumpkin (5%)", prob: 0.05, img: "BotW_Fortified_Pumpkin_Icon.png"},
+      {name: "Blue Nightshade (5%)", prob: 0.05, img: "BotW_Blue_Nightshade_Icon.png"}
+    ]
+  }
+};
+
+let currentAmiibo = amiibos["Ganondorf (1)"];
+let currentScanSize = currentAmiibo.min;
+const lootContainer=document.getElementById('lootContainer');
+const atleastProbSpan=document.getElementById('atleastProb');
+const scanCountDisplay=document.getElementById('scanCountDisplay');
+const amiiboSelect=document.getElementById('amiiboSelect');
+const scanSizeSelect=document.getElementById('scanSizeSelect');
+const multiScanInput=document.getElementById('multiScanInput');
+const simulationCountInput=document.getElementById('simulationCountInput');
+const resetBtn=document.getElementById('resetBtn');
+let currentLootSelects=[];
+
+// Fill amiibo menu
+for(const key in amiibos){let opt=document.createElement('option');opt.value=key;opt.textContent=key;amiiboSelect.appendChild(opt);}
+
+// Update scan size
+function updateScanSizeOptions(){scanSizeSelect.innerHTML='';for(let i=currentAmiibo.min;i<=currentAmiibo.max;i++){const opt=document.createElement('option');opt.value=i;opt.textContent=i;scanSizeSelect.appendChild(opt);}currentScanSize=currentAmiibo.min;scanSizeSelect.value=currentScanSize;}
+
+// Reset button
+resetBtn.addEventListener('click',()=>{ 
+  currentLootSelects.forEach((select)=>{ 
+    select.value="Empty"; 
+    select.dispatchEvent(new Event('change')); 
+  }); 
+  calculateProbability();
+});
+
+// Loot selectors
+function createLootSelectors(){
+  lootContainer.innerHTML='';
+  currentLootSelects=[];
+  for(let i=0;i<currentScanSize;i++){
+    const div=document.createElement('div');
+    div.className='loot-slot';
+    const select=document.createElement('select');
+    currentAmiibo.loots.forEach(loot=>{
+      const opt=document.createElement('option');
+      opt.value=loot.name;
+      opt.textContent=loot.name;
+      select.appendChild(opt);
+    });
+    const img=document.createElement('img');
+    img.className='loot-image';
+    select.addEventListener('change',()=>{
+      const selectedLoot=currentAmiibo.loots.find(l=>l.name===select.value);
+      if(selectedLoot&&selectedLoot.img&&select.value!=="Empty"){
+        img.src='images/'+selectedLoot.img;
+        img.style.display='block';
+      }else{img.style.display='none';}
+      calculateProbability();
+    });
+    div.appendChild(select);
+    div.appendChild(img);
+    lootContainer.appendChild(div);
+    currentLootSelects.push(select);
+  }
+}
+
+// Get probability
+function getLootProb(name){const loot=currentAmiibo.loots.find(l=>l.name===name);return loot?loot.prob:0;}
+
+// === Monte Carlo Simulation ===
+function calculateProbability(){
+  const scanCount = parseInt(multiScanInput.value);
+
+  if (scanCount === 1) {
+    scanCountDisplay.textContent = "1 scan";
+  } else {
+    scanCountDisplay.textContent = scanCount + " scans";
+  }
+
+  const totalLoots = currentScanSize * scanCount;
+  const simulationCount = parseInt(simulationCountInput.value);
+
+  // Count how many of each loot
+  let counts = {};
+  currentLootSelects.forEach(s => {
+    let name = s.value;
+    if (getLootProb(name) > 0) {
+      counts[name] = (counts[name] || 0) + 1;
+    }
+  });
+  let keys = Object.keys(counts);
+  if (keys.length === 0) {
+    atleastProbSpan.textContent = '0%';
+    return;
+  }
+
+  // Precompute probabilities
+  let lootProbs = currentAmiibo.loots.map(l => l.prob);
+  let lootNames = currentAmiibo.loots.map(l => l.name);
+
+  let success = 0;
+  for (let sim = 0; sim < simulationCount; sim++) {
+    let drawnCounts = {};
+    for (let i = 0; i < totalLoots; i++) {
+      let r = Math.random();
+      let acc = 0;
+      for (let j = 0; j < lootProbs.length; j++) {
+        acc += lootProbs[j];
+        if (r <= acc) {
+          drawnCounts[lootNames[j]] = (drawnCounts[lootNames[j]] || 0) + 1;
+          break;
+        }
+      }
+    }
+    let ok = true;
+    for (const k of keys) {
+      if ((drawnCounts[k] || 0) < counts[k]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) success++;
+  }
+
+  atleastProbSpan.textContent = ((success / simulationCount) * 100).toFixed(4) + '%';
+}
+
+// Event listeners
+amiiboSelect.addEventListener('change', () => {
+  currentAmiibo = amiibos[amiiboSelect.value];
+  updateScanSizeOptions();
+  createLootSelectors();
+  calculateProbability();
+});
+scanSizeSelect.addEventListener('change', () => {
+  currentScanSize = parseInt(scanSizeSelect.value);
+  createLootSelectors();
+  calculateProbability();
+});
+multiScanInput.addEventListener('input', () => {
+  if (multiScanInput.value === '' || multiScanInput.value < 1) {
+    multiScanInput.value = 1;
+  }
+  calculateProbability();
+});
+simulationCountInput.addEventListener('input', () => {
+  if (simulationCountInput.value < 10000) {
+    simulationCountInput.value = 10000;
+  }
+  calculateProbability();
+});
+
+// === Instructions page ===
+const showInstructions = document.getElementById('showInstructions');
+const instructionsPage = document.getElementById('instructionsPage');
+const backToSimulator = document.getElementById('backToSimulator');
+
+showInstructions.addEventListener('click', (e) => {
+  e.preventDefault();
+  instructionsPage.classList.add('show');
+  instructionsPage.style.display = 'block';
+});
+
+backToSimulator.addEventListener('click', () => {
+  instructionsPage.classList.remove('show');
+  setTimeout(()=> instructionsPage.style.display = 'none', 300);
+});
+
+// Init
+updateScanSizeOptions();
+createLootSelectors();
+calculateProbability();
+</script>
+</body>
+</html>
